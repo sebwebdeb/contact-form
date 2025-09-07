@@ -1,0 +1,181 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/infrastructure.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/infrastructure.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Bicep templates
+        run: |
+          az bicep build --file infrastructure/main.bicep
+          echo "✅ Bicep template validation successful"
+
+      - name: Run Bicep linter
+        run: |
+          az bicep lint --file infrastructure/main.bicep
+
+  preview-dev:
+    name: Preview Development Infrastructure
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request'
+    environment: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        run: |
+          az group create \
+            --name rg-contact-form-dev-eus-001 \
+            --location eastus
+
+      - name: Preview infrastructure changes
+        run: |
+          az deployment group what-if \
+            --resource-group rg-contact-form-dev-eus-001 \
+            --template-file infrastructure/main.bicep \
+            --parameters infrastructure/parameters/dev.bicepparam \
+            --parameters emailSmtpUser='${{ secrets.EMAIL_SMTP_USER }}' \
+            --parameters emailSmtpPassword='${{ secrets.EMAIL_SMTP_PASSWORD }}' \
+            --parameters recipientEmailAddress='${{ secrets.RECIPIENT_EMAIL_ADDRESS }}'
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    environment: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        run: |
+          az group create \
+            --name rg-contact-form-dev-eus-001 \
+            --location eastus \
+            --tags Project=ContactFormAPI Environment=dev ManagedBy=GitHub
+
+      - name: Deploy infrastructure
+        id: deploy
+        run: |
+          output=$(az deployment group create \
+            --resource-group rg-contact-form-dev-eus-001 \
+            --template-file infrastructure/main.bicep \
+            --parameters infrastructure/parameters/dev.bicepparam \
+            --parameters emailSmtpUser='${{ secrets.EMAIL_SMTP_USER }}' \
+            --parameters emailSmtpPassword='${{ secrets.EMAIL_SMTP_PASSWORD }}' \
+            --parameters recipientEmailAddress='${{ secrets.RECIPIENT_EMAIL_ADDRESS }}' \
+            --query 'properties.outputs' \
+            --output json)
+          
+          echo "deployment-output=$output" >> $GITHUB_OUTPUT
+          echo "✅ Development infrastructure deployed successfully"
+
+      - name: Output deployment results
+        run: |
+          echo "Deployment outputs:"
+          echo '${{ steps.deploy.outputs.deployment-output }}' | jq .
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-dev]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        run: |
+          az group create \
+            --name rg-contact-form-prod-eus-001 \
+            --location eastus \
+            --tags Project=ContactFormAPI Environment=prod ManagedBy=GitHub
+
+      - name: Deploy infrastructure
+        id: deploy
+        run: |
+          output=$(az deployment group create \
+            --resource-group rg-contact-form-prod-eus-001 \
+            --template-file infrastructure/main.bicep \
+            --parameters infrastructure/parameters/prod.bicepparam \
+            --parameters emailSmtpUser='${{ secrets.EMAIL_SMTP_USER }}' \
+            --parameters emailSmtpPassword='${{ secrets.EMAIL_SMTP_PASSWORD }}' \
+            --parameters recipientEmailAddress='${{ secrets.RECIPIENT_EMAIL_ADDRESS }}' \
+            --query 'properties.outputs' \
+            --output json)
+          
+          echo "deployment-output=$output" >> $GITHUB_OUTPUT
+          echo "✅ Production infrastructure deployed successfully"
+
+      - name: Output deployment results
+        run: |
+          echo "Deployment outputs:"
+          echo '${{ steps.deploy.outputs.deployment-output }}' | jq .
