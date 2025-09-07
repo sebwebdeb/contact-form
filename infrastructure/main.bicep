@@ -98,7 +98,7 @@ module functionApp 'modules/function-app.bicep' = {
 
 // Grant Key Vault access to Function App
 resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
-  name: '${keyVault.outputs.keyVaultName}/add'
+  name: '${keyVaultName}/add'
   properties: {
     accessPolicies: [
       {
