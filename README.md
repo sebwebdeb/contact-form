@@ -89,7 +89,7 @@ contact-form-api/
 - Azure Functions Core Tools
 - ProtonMail account with app password
 
-### 1. Clone and Install!
+### 1. Clone and Install
 ```bash
 git clone <your-repo-url>
 cd contact-form-api
