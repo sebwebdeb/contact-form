@@ -33,7 +33,7 @@ var resourcePrefix = '${projectName}-${environment}-eus-001'
 var storageAccountName = replace('st${resourcePrefix}', '-', '')
 var functionAppName = 'func-${resourcePrefix}'
 var appServicePlanName = 'asp-${resourcePrefix}'
-var keyVaultName = 'kv-${resourcePrefix}'
+var keyVaultName = 'kv${replace(resourcePrefix, '-', '')}'
 var appInsightsName = 'ai-${resourcePrefix}'
 var logAnalyticsName = 'law-${resourcePrefix}'
 
