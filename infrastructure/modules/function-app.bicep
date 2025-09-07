@@ -101,9 +101,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       ]
       cors: {
         allowedOrigins: [
-          'https://yourdomain.com'
-          'https://www.yourdomain.com'
-          'https://staging.yourdomain.com'
+          'https://sebastianmateus.com'
+          'https://www.sebastianmateus.com'
+          'https://staging.sebastianmateus.com'
         ]
         supportCredentials: false
       }
