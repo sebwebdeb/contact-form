@@ -64,5 +64,5 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01
 
 output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
-output storageAccountKey string = storageAccount.listKeys().keys[0].value
+// Storage account key should not be exposed in outputs for security
 output primaryEndpoints object = storageAccount.properties.primaryEndpoints

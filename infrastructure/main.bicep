@@ -17,8 +17,6 @@ param tags object = {
   ManagedBy: 'Bicep'
 }
 
-@description('Application Insights instrumentation key')
-param appInsightsInstrumentationKey string = ''
 
 @description('Key Vault secrets')
 @secure()
@@ -92,7 +90,6 @@ module functionApp 'modules/function-app.bicep' = {
     location: location
     tags: tags
     storageAccountName: storage.outputs.storageAccountName
-    storageAccountKey: storage.outputs.storageAccountKey
     appInsightsInstrumentationKey: appInsights.outputs.instrumentationKey
     keyVaultUri: keyVault.outputs.keyVaultUri
     keyVaultName: keyVault.outputs.keyVaultName
